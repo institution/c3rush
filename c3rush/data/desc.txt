@@ -1,0 +1,27 @@
+truck
+excavator/enginer
+
+deploy
+	Fort/CommandBunker []
+	Coal/Metal Mine [energy->coal/metal+solid_garbage]	
+		OilRig
+	Coal Generator [coal->energy+smog, sun->energy, wind->energy]
+	Solar Generator
+	Wind Generator
+	Factory [metal+energy->vehicle+solid_garbage]
+	RecyclingCenter [solid_garbage -> metal, organic_garbage -> energy]
+	GreenHouse [energy->food+organic_garbage]
+	Lab
+	
+
+	MGPost [metal->ammo] -> MGBunker (more health) 
+				         -> MGTurret (longer range)
+
+	Mortar [metal->ammo]
+	Minefield [metal->mines]
+	Barbed Wire -> Electiric Wire
+	
+	
+	
+	
+Floodlights [energy] (increase accuracy/damage?)
