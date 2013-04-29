@@ -1,0 +1,35 @@
+------------------
+Carbonic Group
+	food    C	
+	coal    CC
+	
+Metalic Group
+	metal   MM
+
+Energy  E
+
+Waste   W
+------------------
+Coal Mine: E -> CC + W
+Metal Mine: E -> MM + W
+Generator: CC -> E + W
+Recycler: W + E -> MM
+Greenhouse: E -> C + W
+Solar: -> E
+Fort: -> E, C -> W
+Machine Gun: M + E -> Missle
+Factory: M + E -> Truck, M + E -> Manip
+
+Missle
+
+Truck: E -> Movement
+Manip: E -> Movement
+
+Zombie
+------------------
+Land Forms
+	Mud
+	Coal
+	Iron
+	Grass
+

@@ -50,6 +50,9 @@ class Vector2(tuple):
 	def magnitude(a):
 		return sqrt(a.dot(a))
 		
+	def mag2(a):
+		return a.dot(a)
+		
 	def distance(a,b):
 		return (a - b).magnitude()
 		

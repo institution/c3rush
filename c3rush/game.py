@@ -9,7 +9,7 @@ import time
 import conf
 from vec import point_in_rect, vec
 from collections import defaultdict
-EPSILON = 4
+EPSILON = 4.0
 import weakref
 import math
 
@@ -334,7 +334,7 @@ class Automat(Keyed):
 		
 		Keyed.__init__(self)
 		self._cmds = []
-		self._last_exec = time.time()
+		self._exec_delay = 1.0
 		
 		
 	#def cmd_push(self, ctrl, cmd):
@@ -343,20 +343,18 @@ class Automat(Keyed):
 	
 	
 	def exec_prog(self):
-		n = time.time()
-		if n - self._last_exec > 0.250:
-			self._last_exec = n
-			while len(self._cmds) > 0:
-				func, args1, args2 = self.cpop()
-				
-				x = func(*args1, **args2)
-				
-				if x == None or x == 0 or x == False:
-					break
-	
+		while len(self._cmds) > 0:
+			func, args1, args2 = self.cpop()
+			x = func(*args1, **args2)
+			if x == None or x == 0 or x == False:
+				break
+
 	
 	def update(self, dt):
-		self.exec_prog()
+		self._exec_delay += dt
+		if self._exec_delay > 0.5:
+			self.exec_prog()
+			self._exec_delay = 0.0
 	
 	def cpush(self, cmd, *args1, **args2):
 		""" Append command to program """
@@ -649,19 +647,17 @@ class MobileAutomat(Mobile, Automat):
 	def move(self, center, d = EPSILON):
 		if dist(center, self.center) < d:
 			# dojechane
+			print 'move complete', dist(center, self.center)
 			self.vel = vec()
 			return 1
 			
 		else:
 			delta = (center - self.center)
-			
-			eta = delta.magnitude() / self.max_velocity
-						
+									
 			# jedz dalej
 			self.vel = (center - self.center).normal() * self.max_velocity
 			
 			self.cpush(self.move, center, d)
-			self.cpush(self.wait, min(eta, 2.0))
 			
 			
 			return 0
@@ -854,11 +850,14 @@ class Manip(MobileAutomat, Health):
 		#self.tank = SContainer(volume=TRUCK_TANK_SIZE)
 		self.ctrl = ctrl
 		
-	def place(self, what):
-		self.env.xs.append(what(self.env, self.pos, self.ctrl))
+	def place(self, what, where):
+		if dist(self.center, where) <= EPSILON:
+			self.env.xs.append(what(self.env, where - what.dim/2.0, self.ctrl))
+		else:
+			raise Error('too far to place', dist(self.pos, where))
 		
 	def build(self, what, where):
-		self.cpush(self.place, what)
+		self.cpush(self.place, what, where)
 		self.move(where)
 		
 		

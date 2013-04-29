@@ -17,9 +17,6 @@ import pygame
 
 GameBox=Env
 
-#_night_effect = Surface.convert_alpha(Surface(GAME_SIZE.tuple()))
-#_night_effect.fill((0,0,50,70))
-
 
 """
 grass!
@@ -175,20 +172,20 @@ class Interface(PBox):
 			'c': Mirage(file='land/coal.svg', dim=SMALL),
 			'm': Mirage(file='land/iron.svg', dim=SMALL),
 			'g': Mirage(file='land/grass.svg', dim=SMALL),
-			'move': Mirage(file='icon/move.svg', dim=SMALL),
-			'stop': Mirage(file='icon/stop.svg', dim=SMALL),
-			Truck: Mirage(file='truck.svg',dim=SMALL),
-			Manip: Mirage(file='manip.svg',dim=SMALL),
-			CoalMine: Mirage(file='mine.svg', dim=MEDIUM),
-			MetalMine: Mirage(file='mine.svg', dim=MEDIUM),
-			Generator: Mirage(file='generator.svg', dim=MEDIUM),
+			'move': Mirage(file='symbol/move.svg', dim=SMALL),
+			'stop': Mirage(file='symbol/stop.svg', dim=SMALL),
+			Truck: Mirage(file='vehicle/truck.svg',dim=SMALL),
+			Manip: Mirage(file='vehicle/manip.svg',dim=SMALL),
+			CoalMine: Mirage(file='struct/coalmine.svg', dim=MEDIUM),
+			MetalMine: Mirage(file='struct/metalmine.svg', dim=MEDIUM),
+			Generator: Mirage(file='struct/generator.svg', dim=MEDIUM),
 			Solar: Mirage(file='struct/solar.svg', dim=SMALL),
-			MGPost: Mirage(file='mg.svg', dim=SMALL),
-			ControlPost: Mirage(file='fort.svg', dim=MEDIUM),
-			Factory: Mirage(file='factory.svg', dim=MEDIUM),
-			Mutant:	Mirage(file='mutant.svg', dim=MEDIUM),
-			Recycler: Mirage(file='recycler.svg', dim=MEDIUM),
-			GreenHouse:	Mirage(file='greenhouse.svg', dim=MEDIUM),
+			MGPost: Mirage(file='struct/mg.svg', dim=SMALL),
+			ControlPost: Mirage(file='struct/fort.svg', dim=MEDIUM),
+			Factory: Mirage(file='struct/factory.svg', dim=MEDIUM),
+			Mutant:	Mirage(file='struct/mutant.svg', dim=MEDIUM),
+			Recycler: Mirage(file='struct/recycler.svg', dim=MEDIUM),
+			GreenHouse:	Mirage(file='struct/greenhouse.svg', dim=MEDIUM),
 		}
 		
 		def render(type, **kwargs):
@@ -289,6 +286,12 @@ class Interface(PBox):
 		
 		self.on(self.ctrl, et.MOUSEBUTTONDOWN, self.wheel_zoom)
 		
+		
+		self._wheel_scrool = 0
+		
+		self.on(self.ctrl, et.MOUSEBUTTONDOWN, self.start_wheel_scrool)
+		self.on(self.ctrl, et.MOUSEBUTTONUP, self.stop_wheel_scrool)
+
 		self.refresh()		
 		
 		self.gamebox.set_zoom(1.0)
@@ -306,15 +309,34 @@ class Interface(PBox):
 		
 		self.infobox.select(ev.sel)
 	
+	
+	
 	def wheel_zoom(self, event):
 		if event.button == 4:
 			self.gamebox.mul_zoom(1.1)
 			
 		elif event.button == 5:
 			self.gamebox.mul_zoom(0.9)
+	
+	def start_wheel_scrool(self, event):
+		if event.button == 2:
+			self._wheel_scrool = 1
+			self._wheel_scrool_mpos = vec(pygame.mouse.get_pos())
 		
-		elif event.button == 2:
-			self.gamebox.set_zoom(1.0)
+	def stop_wheel_scrool(self, event):
+		if event.button == 2:
+			self._wheel_scrool = 0
+			self._wheel_scrool_mpos = None
+		
+		
+	def make_wheel_scrool(self):
+		if self._wheel_scrool:
+			cpos = vec(pygame.mouse.get_pos())
+			delta = self._wheel_scrool_mpos - cpos
+			self._wheel_scrool_mpos = cpos
+			
+			self.gamebox.move_window(delta)
+			
 		
 	
 	def rblit(self, to):
@@ -326,6 +348,8 @@ class Interface(PBox):
 	def update(self, dt):
 		self.infobox.update(dt)
 		self.gamebox.update(dt)
+		
+		self.make_wheel_scrool()
 	
 	def mainloop(self, g):
 		dt = g.dt
@@ -582,26 +606,66 @@ class GameBox(Box, EventSource):
 	def get_zoom(self):
 		return self._dscale
 
-	def mul_zoom(self, mul):
-		# real zoom
-		self._rscale *= mul
-		# discrette zoom such that field_dim is int
-		self._dscale = int(self._rscale * FIELD_DIM) / float(FIELD_DIM)
-		# update window
-		self.window_dim = vec(self.dim) / self._dscale
+	def constraint_window(self):
+		map_dim = vec(self.map_dim) * self.get_zoom()
 		
-		#self.window_dim = vec(self.pos) * self._dscale
+		if self.window_pos[1] < 0:
+			self.window_pos = vec(self.window_pos[0], 0)
+						
+		if self.window_pos[1] + self.window_dim[1] > map_dim[1]:
+			self.window_pos = vec(self.window_pos[0], map_dim[1] - self.window_dim[1])
+										
+		if self.window_pos[0] < 0:
+			self.window_pos = vec(0, self.window_pos[1])
+							
+		if self.window_pos[0] + self.window_dim[0] > map_dim[0]:
+			self.window_pos = vec(map_dim[0] - self.window_dim[0], self.window_pos[1])
 		
+			
+		
+			
 
+	def _update_zoom(self, _rscale):
+		# discrette zoom such that field_dim is int
+		_dscale = int(_rscale * FIELD_DIM) / float(FIELD_DIM)
+		
+		# window_dis
+		window_dim = vec(self.dim) / _dscale
+		
+		# window pos such that map point under mouse do not move
+		rmpos = vec(pygame.mouse.get_pos()) - vec(self.pos)
+		window_pos = self.window_pos + rmpos/self._dscale - rmpos/_dscale
+		
+		# set
+		self._rscale = _rscale
+		self._dscale = _dscale
+		self.window_dim = window_dim
+		self.window_pos = window_pos
+		
+		self.constraint_window()
+
+	def mul_zoom(self, mul):
+		self._update_zoom(self._rscale * mul)
+		
 	def set_zoom(self, zoom):
-		# real zoom
-		self._rscale = zoom		
-		# discrette zoom
-		self._dscale = int(self._rscale * FIELD_DIM) / float(FIELD_DIM)
-		# update window dim
-		self.window_dim = vec(self.dim) / self._dscale
+		self._update_zoom(zoom)
 		
+	
+	def BtoA(self, pos_b):
+		"""
+		B -- position on game map
+		A -- position relative to user interface window
+		"""
+		return (vec(pos_b) - self.window_pos) * self.get_zoom() + vec(self.pos)
 		
+	def AtoB(self, pos_a):
+		"""
+		A -- position relative to user interface window
+		B -- position on game map
+		"""
+		
+		return (vec(pos_a) - vec(self.pos)) / self.get_zoom() + self.window_pos
+	
 		
 	@property
 	def window_end(self):
@@ -666,22 +730,6 @@ class GameBox(Box, EventSource):
 				 
 
 	
-	
-	def BtoA(self, pos_b):
-		"""
-		B -- position on game map
-		A -- position relative to user interface window
-		"""
-		return (vec(pos_b) - self.window_pos) * self.get_zoom() + vec(self.pos)
-		
-	def AtoB(self, pos_a):
-		"""
-		A -- position relative to user interface window
-		B -- position on game map
-		"""
-		
-		 
-		return (vec(pos_a) - vec(self.pos)) / self.get_zoom() + self.window_pos
 	
 	
 
@@ -748,6 +796,12 @@ class GameBox(Box, EventSource):
 		# obrobka w
 		return w
 	
+	
+	def move_window(self, delta):
+		self.window_pos = self.window_pos + delta
+		self.constraint_window()
+
+	
 	def update(self, dt):
 		
 		SPEED = 20.0 
@@ -758,25 +812,10 @@ class GameBox(Box, EventSource):
 		
 		# pygame.VIDEORESIZE
 		
-		if keys[pygame.K_w] or keys[pygame.K_UP]:
-			self.window_pos = self.window_pos + vec(0,-1) * SPEED
-			if self.window_pos[1] < 0:
-				self.window_pos = vec(self.window_pos[0], 0)
-						
-		if keys[pygame.K_s] or keys[pygame.K_DOWN]:
-			self.window_pos = self.window_pos + vec(0,1) * SPEED
-			if self.window_pos[1] + self.window_dim[1] > map_dim[1]:
-				self.window_pos = vec(self.window_pos[0], map_dim[1] - self.window_dim[1])
-											
-		if keys[pygame.K_a] or keys[pygame.K_LEFT]:
-			self.window_pos = self.window_pos + vec(-1,0) * SPEED
-			if self.window_pos[0] < 0:
-				self.window_pos = vec(0, self.window_pos[1])
-								
-		if keys[pygame.K_d] or keys[pygame.K_RIGHT]:
-			self.window_pos = self.window_pos + vec(1,0) * SPEED
-			if self.window_pos[0] + self.window_dim[0] > map_dim[0]:
-				self.window_pos = vec(map_dim[0] - self.window_dim[0], self.window_pos[1])
+		vert = int(keys[pygame.K_s] or keys[pygame.K_DOWN]) - int(keys[pygame.K_w] or keys[pygame.K_UP])
+		hori = int(keys[pygame.K_d] or keys[pygame.K_RIGHT]) - int(keys[pygame.K_a] or keys[pygame.K_LEFT])
+			
+		self.move_window(vec(hori, vert) * SPEED)			
 			
 		
 		
@@ -793,245 +832,6 @@ class GameBox(Box, EventSource):
 		
 
 
-
-def match_action():
-	pass
-	
-
-
-
-
-# --------------------------------------------------------
-class View(object):
-	def inc_speed(self):
-		self.game.speed *= 1.2
-	
-	def res_speed(self):
-		self.game.speed = 1.0
-	
-	"""
-	terrain layer
-	track layer
-	buildings layer
-	vehicles layer
-	weather/day-night/smog layer
-	render mouse layer
-	"""
-	
-	def render_terrain(self):
-		pass
-		
-	def render_track(self):
-		pass
-		
-	def render_structure(self):
-		pass
-		
-	def render_vehicle(self):
-		
-		pass
-			
-		
-	def render_weather(self):
-		pass
-		
-	def render_mouse(self):
-		pass
-
-	
-	def __init__(view, game):
-		view.game = game
-		view.env = game
-		view.selection = None
-		view.selection_frame = Image(file='data/select.svg', dim=vec(100,100))
-	
-		view.num_dt = 1.0
-		view.sum_dt = 1.0
-	
-		view.mode = None
-	
-		# boxes
-		frame = CBox(id="frame", dim = window_size, pos=(0,0))
-		side = VBox(id="side", pos=(frame.x, frame.y), expand=(-1,1),
-			lower_bound=(SIDEPANEL_SIZE,100), upper_bound=(frame.w, frame.h))
-		top = CBox(id="top", pos=(side.x+side.w, side.y), expand=(1,-1), dim=(frame.w-side.w, None), lower_bound=(100,80))
-		game = GameBox(
-			game = game, 
-			id="game", 
-			expand=(0,0), pos=(side.x+side.w, top.y+top.h), dim=(frame.w-side.w, frame.h-top.h))
-		
-		frame.add(left, top, game)
-		
-		
-		#view.gres = ImageBox(img=Image(text=' '*32, color=WHITE))
-		#topbar.append(view.gres)
-		#view.clock = ImageBox(img=Image(text=' '*32, color=WHITE))
-		#topbar.append(view.clock)
-		#topbar.append(ImageBox(img=Image(text='next wave     ', color=WHITE),
-		#		onclick=partial(view.game.next_wave, 4) ))
-		#topbar.append(ImageBox(img=Image(text='inc_speed  ', color=WHITE),
-		#		onclick=view.inc_speed ))
-		#topbar.append(ImageBox(img=Image(text='res_speed  ', color=WHITE),
-		#		onclick=view.res_speed ))
-		#view.fps = ImageBox(img=Image(text='fps:      ', color=WHITE))
-		#topbar.append(view.fps)
-		
-		
-		view.buildings = [CoalMine,MetalMine,Generator,Factory,GreenHouse,
-			Recycler,ControlPost,MGPost]
-		
-		#side.add_boxes()
-		#FText(text=bu.__name__, font=FONT, color=WHITE) for bu in view.buildings:
-		#	sidepanel.append(ImageBox(img=Image(text=bu.__name__, color=WHITE),
-		#		onclick=partial(view.set_mode, bu) ))			
-		
-		#view.infobox = VBox()
-		#view.infobox.append(VBox())
-		#sidepanel.append(view.infobox)
-		
-		#view.sidepanel = sidepanel
-		
-		#view.gamebox = game
-		#view.game = game
-		#view.env = game
-		
-		#midbox = HBox()
-		#midbox.append(sidepanel)
-		#midbox.append(game)
-		#print game.env
-		
-		#mainbox = VBox(pos=vec())
-		#mainbox.env = None
-		#mainbox.append(topbar)
-		#mainbox.append(midbox)
-		
-		#view.root = mainbox
-		
-
-		
-
-		
-		
-		
-	
-	# ---------------------------------	
-	def set_mode(view, mode):
-		view.mode = mode
-	
-	# ---------------------------------
-	def update_infobox(self, obj):
-		
-		func = infobox_tab.get(type(obj))
-		if func:
-			self.infobox[0] = func(obj)
-		else:
-			self.infobox[0] = universal_infobox(obj)
-			
-			
-	# ---------------------------------
-	def read_event(view, e):
-		
-		if e.type == KEYDOWN:
-			if e.key == K_ESCAPE:
-				view.mode = None
-				
-		
-		elif e.type == MOUSEBUTTONDOWN:
-			if e.button == 1:
-
-				x = find_collision(view.root, vec(*e.pos))
-				try:
-					id = x.id
-				except:
-					id = ''
-					
-				if hasattr(x, 'onclick'):
-					x.onclick()
-					
-				#print 'clicked on ', type(x), 'id', id
-				
-				game_pos = abs_pos(view.game, vec())
-				if type(x) == GameBox:
-					if view.mode != None:
-						view.game.build(view.mode, vec(*e.pos) - SMALL_SIZE*0.5 - game_pos)
-						
-					
-				view.selection = x
-				
-			elif e.button == 2 or e.button == 3:
-				view.mode = None
-			
-			
-			
-		#elif event.type is MOUSEBUTTONUP:
-		
-	
-		
-	# ---------------------------------
-	def update(view, dt):
-		self = view
-		
-		view.game.update(dt)
-		
-		view.num_dt += 1.0
-		view.sum_dt += dt
-		avg_dt = view.sum_dt/view.num_dt		
-		
-		if view.sum_dt >= 1.0:
-			view.num_dt = 1.0
-			view.sum_dt = avg_dt
-		
-		view.fps.img = Image(text='avg_dt: %.0fms (max: 30)' % (avg_dt*1000.0), color=WHITE)
-				
-		self.terrain.update(dt)
-				
-		view.update_infobox(view.selection)
-		
-
-
-	# ---------------------------------
-	def render(view):
-		self = view
-		
-		
-		
-		# interface layer
-		#  box layer
-		#  mouse layer
-		
-		
-
-		if view.game.is_day:
-			txt = 'daytime'
-		else: txt = 'nighttime'
-		
-		view.clock.img = Image(text='%s: %.0f' % (txt, view.game.hour+0.5), color=WHITE)
-		view.gres.img = Image(text='energy: %.0f' % view.env.cont[energy], color=WHITE)
-		
-		game_pos = abs_pos(view.game, vec())		
-		self.terrain.render(game_pos)
-		
-		
-		for x in self.env.radar_all(Mobile):		
-			render_all(view.root, vec())
-				
-				
-				
-				
-		if view.selection != None:
-			p = abs_pos(view.selection, vec())
-			render_rect(p, view.selection.dim, color=(0,200,200), width=1)
-			
-		
-		if view.mode:
-			m = vec(*pygame.mouse.get_pos()) - SMALL_SIZE*0.5 - game_pos
-			v = view.game.round_xy_by_ab(m) + game_pos
-			
-			timg = image_tab[view.mode.__name__+'-trans']
-			screen.blit(timg.surface, v.tuple())
-			
-			
-		
 	
 	
 	
@@ -1062,27 +862,8 @@ def render_all(x, base_pos):
 
 		base_pos -= x.pos
 		
-	
-		
 
 
-
-
-# -------------------------------------------------------------
-
-
-def render_ImageBox(base_pos, x):
-	x.img.render(base_pos + x.pos)
-
-
-# (pos, size): {'onclick': fun}
-
-def render_GameBox(base_pos, env):
-	pass
-	# render effects
-	#if not env.is_day:
-	#	image_tab['night_effect'].render(base_pos + env.pos)
-	
 	
 			
 def render_unknown(base_pos, x):
