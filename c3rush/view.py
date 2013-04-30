@@ -168,6 +168,11 @@ class Interface(PBox):
 		MEDIUM = vec(48,48)
 	
 		self.render_tab = {	
+			Energy: Mirage(file='symbol/energy.svg', dim=SMALL),
+			Metal: Mirage(file='symbol/metal.svg', dim=SMALL),
+			Coal: Mirage(file='symbol/coal.svg', dim=SMALL),
+			Food: Mirage(file='symbol/food.svg', dim=SMALL),
+			Waste: Mirage(file='symbol/waste.svg', dim=SMALL),
 			'.': Mirage(file='land/mud.svg', dim=SMALL),
 			'c': Mirage(file='land/coal.svg', dim=SMALL),
 			'm': Mirage(file='land/iron.svg', dim=SMALL),
@@ -373,7 +378,7 @@ class Interface(PBox):
 			 
 		# update
 		self.update(dt)
-		self.game.update(dt)
+		self.game.update(dt*8.0)
 		
 				
 	
@@ -438,7 +443,11 @@ class Infobox(VBox):
 			dim = lambda s: (s.p.dim[0], s.p.dim[0]),
 		)
 		
-		self.add(self.cmdbox, self.progbox)
+		self.resbox = VBox(
+			dim = lambda s: (s.p.dim[0], 140),
+		)
+
+		self.add(self.cmdbox, self.resbox, self.progbox)
 
 	def h_unit_order(self, box, action, event, addargs=None):	
 		if event.button == 1:
@@ -454,7 +463,8 @@ class Infobox(VBox):
 	def select(self, x):
 		self.target = x
 		
-		if isinstance(x, Manip):
+		if isinstance(x, MobileAutomat):
+			
 			# icon action addargs
 			ICON = 0
 			ACTION = 1
@@ -462,17 +472,21 @@ class Infobox(VBox):
 			orders = [
 				('move', 'move'),
 				('stop', 'stop'),
-				(CoalMine, 'build', CoalMine),
-				(MetalMine, 'build', MetalMine),
-				(Generator, 'build', Generator),
-				(Solar, 'build', Solar),
-				(MGPost, 'build', MGPost),
-				(ControlPost, 'build', ControlPost),
-				(Factory, 'build', Factory),
-				#('build', Mutant),
-				(Recycler, 'build', Recycler),
-				(GreenHouse, 'build', GreenHouse),
 			]
+			
+			if isinstance(x, Manip):
+				orders.extend([
+					(CoalMine, 'build', CoalMine),
+					(MetalMine, 'build', MetalMine),
+					(Generator, 'build', Generator),
+					(Solar, 'build', Solar),
+					(MGPost, 'build', MGPost),
+					(ControlPost, 'build', ControlPost),
+					(Factory, 'build', Factory),
+					#('build', Mutant),
+					(Recycler, 'build', Recycler),
+					(GreenHouse, 'build', GreenHouse),
+				])
 			
 			self.cmdbox.clear()
 			
@@ -508,6 +522,29 @@ class Infobox(VBox):
 		
 	def update(self, dt):
 		x = self.target
+		
+		if isinstance(x, BaseContainer):
+			self.resbox.clear()
+			
+			for r in x:
+				t = '{0} {1:.1f}/{2:.1f}'.format(r.name, x.mult(r), x.capacity(r))
+				
+				self.resbox.add(
+					TextBox(
+						text = t, 
+						font = self.font,
+						dim = lambda s: s.content.dim,
+					)
+				)
+				
+				
+			self.resbox.refresh()
+			
+		else:
+			if len(self.resbox):
+				self.resbox.clear()
+				self.resbox.refresh()
+				
 				
 		if isinstance(x, Automat):
 			ts = [x.cget(i)[0].__name__ for i in range(0, x.clen())]
@@ -521,7 +558,7 @@ class Infobox(VBox):
 							dim = lambda s: s.content.dim,
 						)
 					)
-					i += 1
+				
 					
 				self.progbox.refresh()
 				self.last_ts = ts

@@ -395,7 +395,6 @@ class Automat(Keyed):
 			
 	
 	
-# ------------------------------------
 #~ class PhysicalUnit(object):
 	#~ def weight(self):
 		#~ return self.unit_weight
@@ -405,7 +404,6 @@ class Automat(Keyed):
 		
 
 
-# ------------------------------------
 """ indeksowany instancja obiektu 
 moze przechowywac objekty podtypu takiego jak what
 cont.volume
@@ -415,7 +413,6 @@ cont[what]
 class BaseContainer(dict):
 	pass
 
-# ------------------------------------
 class UnivContainer(BaseContainer):
 
 	def __init__(self, type=object, volume=float('+inf')):
