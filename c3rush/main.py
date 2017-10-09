@@ -3,7 +3,7 @@
 #	SEApo Python Remake
 #	version: 0.3
 #	license: GPLv3 or later 
-#	written by: sta256@gmail.com
+#	written by: sta256+c3rush at gmail.com
 #	
 #	This is python cover of flash game "Super Energy Apocalipse".
 #
@@ -56,13 +56,17 @@ def test():
 	from view import GameBox
 
 	env = Env()
+	
+	#env.load('map/aaa.txt')
 		
 	window_size = (900,600)
 	
 	g = G(window_size)
 		
 	interface = Interface(game=env, g = g, window_size = window_size)
-		
+	
+	
+	
 	g.loop(interface.mainloop)
 	
 	

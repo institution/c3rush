@@ -33,6 +33,9 @@ class Res(object):
 		
 	def __str__(self):
 		return self.name
+		
+	def dump(self):
+		return '{}()'.format(self.__class__.__name__)
 
 
 class Energy(Res):
@@ -166,7 +169,7 @@ class Health(object):
 	
 	def __nonzero__(self):
 		return int(self.health)
-
+		
 
 
 
@@ -311,36 +314,59 @@ class Control(object):
 
 
 
-#class Control(object):
-#	pass
 
 
-def g_get_next_key(_c=[0]):
-	_c[0] += 1
-	return _c[0]
+def g_get_uniq_key(use=None, _used=set([0])):
+	if use is None:
+		use = max(_used) + 1		
+	
+	if use in _used:
+		raise Error('use key not unique')
+		
+	_used.add(use)
+		
+	return use
 
 class Keyed(object):
-	def __init__(self):
-		self.key = g_get_next_key()
+	def __init__(self, **kw):
+		key = kw.pop('key', None)
+		self.key = g_get_uniq_key(key)
+		
+	
+
+
 
 class Error(Exception):
 	pass
 
+
+
+def test_automat_dump():
+	a = Automat(key = 11, _cmds = [1,2,3], _exec_delay = 0.3)
+	d = a.dump()
+	e = {
+		'key': 11,
+		'_cmds': [1,2,3],
+		'_exec_delay': 0.3,
+	}
+	assert d == e, repr((d, e))
+
 class Automat(Keyed):
-	
-	# -------------------------
 	def __init__(self, **kwargs):
 		#self.ctrl = kwargs.pop('ctrl', None)
 		
-		Keyed.__init__(self)
-		self._cmds = []
-		self._exec_delay = 1.0
+		self._cmds = kwargs.pop('_cmds', [])
+		self._exec_delay = kwargs.pop('_exec_delay', 1.0)
 		
+		Keyed.__init__(self, **kwargs)
+				
 		
 	#def cmd_push(self, ctrl, cmd):
 	#	if self.ctrl != ctrl:
 	#		raise Error('will not comply')
 	
+
+		
 	
 	def exec_prog(self):
 		while len(self._cmds) > 0:
@@ -348,13 +374,16 @@ class Automat(Keyed):
 			x = func(*args1, **args2)
 			if x == None or x == 0 or x == False:
 				break
-
 	
 	def update(self, dt):
 		self._exec_delay += dt
 		if self._exec_delay > 0.5:
 			self.exec_prog()
 			self._exec_delay = 0.0
+	
+	def crpush(self, cmd, *args1, **args2):
+		""" Append command to program """
+		self._cmds.insert(0, (cmd, args1, args2))
 	
 	def cpush(self, cmd, *args1, **args2):
 		""" Append command to program """
@@ -415,7 +444,7 @@ class BaseContainer(dict):
 
 class UnivContainer(BaseContainer):
 
-	def __init__(self, type=object, volume=float('+inf')):
+	def __init__(self, volume=float('+inf')):
 		dict.__init__(self)
 
 		self.volume = volume
@@ -565,7 +594,7 @@ class Decoy(object):
 	# must have dim
 	
 	# ------------------------------
-	def __init__(self, env, pos):
+	def __init__(self, pos, env=None):
 		self.pos = pos
 		self.env = env
 		
@@ -690,7 +719,7 @@ class Mutant(MobileAutomat, Health):
 	max_health = MUTANT_HEALTH
 	
 	# -------------------------
-	def __init__(self, env, pos, ctrl=None):
+	def __init__(self, pos, ctrl=None, env=None):
 		MobileAutomat.__init__(self, env, pos)
 		Health.__init__(self)
 		
@@ -698,6 +727,8 @@ class Mutant(MobileAutomat, Health):
 		
 		self.cpush(self.choose_target)
 
+	def dump(self, blacklist=None):
+		bl = ['ctrl']
 
 	# -------------------------
 	def update(self, dt):
@@ -849,7 +880,7 @@ class Manip(MobileAutomat, Health):
 		
 	def place(self, what, where):
 		if dist(self.center, where) <= EPSILON:
-			self.env.xs.append(what(self.env, where - what.dim/2.0, self.ctrl))
+			self.env.add(what(self.env, where - what.dim/2.0, self.ctrl))
 		else:
 			raise Error('too far to place', dist(self.pos, where))
 		
@@ -1063,7 +1094,7 @@ class Factory(Structure):
 			
 		if self.mult(new_truck) >= 1:
 			self.add(new_truck, -1)
-			self.env.append(Truck(self.env, self.pos, ctrl=self.ctrl))
+			self.env.add(Truck(self.env, self.pos, ctrl=self.ctrl))
 			
 			
 
@@ -1201,32 +1232,32 @@ class Map(object):
 	GRASS = 'g'
 	
 	
-	# --------------------
 	def __init__(self, file):
 		f = open(file)
+		self.load(f)
+		f.close()
+	
+	def dump(self):
+		return 'Map({0})'.format(repr('\n'.join(self._map)))
+					
+	def load(self, strio):
 		self._map = []
-		ls = f.readlines()
+		ls = strio.readlines()
 		for l in ls:
 			self._map.append(l[:-1])	# bez entera
-		
-		f.close()
-		
-	# --------------------
+					
 	def __call__(self, x, y):
 		return self._map[y][x]
 	
 	def get(self, x, y):
 		return self._map[y][x]
 			
-	# --------------------
 	def size(self):
 		return (len(self._map[0]), len(self._map))
 	
 	def dim(self):
 		return (len(self._map[0]), len(self._map))
-	
 		
-	# --------------------
 	def __iter__(self):
 		(mi, mj) = self.size()
 		j = 0
@@ -1281,13 +1312,63 @@ class IndexedList(object):
 		return self._by_key.get(key)
 	
 	
+from types import FunctionType, MethodType
+
+def test_dump():
+	g = Game()
+	g.update(0.01)
+	print dump(g)
+	assert 0
+
+def fkw(d):
+	return ', '.join(['{}={}'.format(k, dump(v)) for k,v in d.items()])
+	
+def fag(xs):
+	return ', '.join([dump(v) for v in xs])
+
+def dump(x, attrs=None, _vis=set()):
+	if hasattr(x, 'dump'):
+		return x.dump()
+	
+	elif type(x) in (dict,):
+		return 'Dict({})'.format(fkw(x))
+	
+	elif type(x) in (list,):
+		return 'List({})'.format(fag(x))
+		
+	elif type(x) in (dict, list, tuple, float, int, str, unicode):
+		return repr(x)
+		
+	else:
+		print '>>>', x
+		t = dict()
+		for k in x.__dict__:
+			if attrs is not None and k in attrs:
+				k_in_attrs = 1
+			else:
+				k_in_attrs = 1
+								
+			if k_in_attrs and not k.startswith('_'):
+				v = getattr(x, k)
+				if not type(v) == MethodType:
+					t[k] = dump(v)
+		ka = ', '.join(['{}={}'.format(k,v) for k,v in t.items()])
+		return '{}({})'.format(x.__class__.__name__, ka)
+		
 
 
-# ------------------------------------
+
+
 class Env(object):
 	
+	def add(self, x):
+		if hasattr(x, 'env'):
+			x.env = self
+		self.xs.append(x)
 	
-	# -------------------------
+	def dump(self):
+		self.map.dump()
+	
 	def __init__(self):
 		super(Env, self).__init__()
 		
@@ -1302,10 +1383,10 @@ class Env(object):
 		self.hour = DAY_TIME
 
 		self.cc1 = Control()
-		self.xs.append(Truck(self, vec(10,10), ctrl=self.cc1))
-		self.xs.append(Truck(self, vec(40,20), ctrl=self.cc1))
-		self.xs.append(Manip(self, vec(90,25), ctrl=self.cc1))
-		self.xs.append(Manip(self, vec(0,0), ctrl=self.cc1))
+		self.add(Truck(pos=vec(10,10), ctrl=self.cc1))
+		self.add(Truck(pos=vec(40,20), ctrl=self.cc1))
+		self.add(Manip(pos=vec(90,25), ctrl=self.cc1))
+		self.add(Manip(pos=vec(0,0), ctrl=self.cc1))
 		
 		
 		#self.append(Mutant(pos=vec(170, 320), ctrl=None))
@@ -1512,6 +1593,6 @@ class Env(object):
 
 
 
-
+Game = Env
 
 
